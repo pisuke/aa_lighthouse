@@ -8,6 +8,8 @@ Code for controlling the light in the 2020 Mark Fisher Scholarship performance e
 3. `python lighthouse_xim_cycle.py`
 
 The output is something like this
+
+```
    _            _         _
 \_|_)  o       | |       | |
   |        __, | |   _|_ | |     __          ,   _
@@ -34,3 +36,4 @@ Enter:
 	? show commands
 	q to quit
 >
+```
