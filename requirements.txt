@@ -1,3 +1,4 @@
 pyfiglet
 serial
 pycrypto
+pyOSC
