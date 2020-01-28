@@ -209,15 +209,8 @@ if __name__ == '__main__':
     commands = 'Enter:\n\td to detect and print devices\n\tb to set individual LED brightness\n\ta to set all lights to maximum brightness\n\to to switch off all lights\n\ts to start the dimming sequence\n\te to end the dimming sequence\n\t? show commands\n\tq to quit'
     # print(commands)
 
-
-    server.addMsgHandler( "/1/fader1",fader_callback)
-    server.addMsgHandler( "/1/fader2",fader_callback)
-    server.addMsgHandler( "/1/fader3",fader_callback)
-    server.addMsgHandler( "/1/fader4",fader_callback)
-    server.addMsgHandler( "/1/fader5",fader_callback)
-    server.addMsgHandler( "/1/fader6",fader_callback)
-    server.addMsgHandler( "/1/fader7",fader_callback)
-    server.addMsgHandler( "/1/fader8",fader_callback)
+    for i in range(1, 9):
+        server.addMsgHandler( "/1/fader" + str(i),fader_callback)
 
     while True:
         server.handle_request()
