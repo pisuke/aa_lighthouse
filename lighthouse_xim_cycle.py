@@ -16,15 +16,13 @@ from collections import OrderedDict
 from OSC import OSCServer,OSCClient, OSCMessage
 
 system = platform.system()
-debug = False
 dimming = None
-server = OSCServer(("0.0.0.0", OSC_PORT))
+server = None
 
 # set up cfg
 if system == "Darwin":
     cfg.MACOS = True
-    cfg.WINDOWS = False
-    cfg.LINUX = False
+    cfg.WINDOWS = False cfg.LINUX = False
 elif system == "Windows":
     cfg.WINDOWS = True
     cfg.MACOS = False
@@ -287,9 +285,8 @@ def print_devices_callback(path, tags, args, source):
 
 if __name__ == '__main__':
 
-    if len(sys.argv) > 1 and sys.argv[1] == '-d':
-        debug = True
-        print("DEBUG")
+    if len(sys.argv) > 1 and sys.argv[1] == '-osc':
+        server = OSCServer(("0.0.0.0", OSC_PORT))
 
     # display welcome message
     f1 = Figlet(font='script')
@@ -297,45 +294,54 @@ if __name__ == '__main__':
     f2 = Figlet(font='small')
     print(f2.renderText('lighting control'))
 
-    if not debug:
     # if Ctrl-C is invoked call the function to exit the program
-        signal.signal(signal.SIGINT, exit_handler)
-        # start thread
-        xim = BleXimThread()
-        xim.start()
-        deviceList = None
-        print("Detecting XIM LEDs, please wait ...")
-        for i in range(20):
-            deviceList = xim.get_device_list()
-            time.sleep(.25)
-        # start dimming rotation thread
-        dimming = XIMDimmingRotation(xim, deviceList, FADE_TIME)
-        dimming.start()
-        print("Number of XIM LEDs: " + str(dimming.ximNumber))
+    signal.signal(signal.SIGINT, exit_handler)
+    # start thread
+    xim = BleXimThread()
+    xim.start()
+    deviceList = None
+    print("Detecting XIM LEDs, please wait ...")
+    for i in range(20):
+        deviceList = xim.get_device_list()
+        time.sleep(.25)
+    # start dimming rotation thread
+    dimming = XIMDimmingRotation(xim, deviceList, FADE_TIME)
+    dimming.start()
+    print("Number of XIM LEDs: " + str(dimming.ximNumber))
     # basic command prompt loop
-    commands = 'Enter:\n\td to detect and print devices\n\tb to set individual LED brightness\n\ta to set all lights to maximum brightness\n\to to switch off all lights\n\ts to start the dimming sequence\n\te to end the dimming sequence\n\t? show commands\n\tq to quit'
+    commands = 'Enter:\
+        \n\td to detect and print devices\
+        \n\tb to set individual LED brightness\
+        \n\ta to set all lights to maximum brightness\
+        \n\to to switch off all lights\
+        \n\ts to start the dimming sequence\
+        \n\te to end the dimming sequence\
+        \n\t0 to start the breathing sequence\
+        \n\t1 to end the breathing sequence\
+        \n\t2 to start the breath fading sequence\
+        \n\t3 to end the breath fading sequence\
+        \n\t? show commands\n\tq to quit'
     print(commands)
 
-    for i in range(1, 9):
-        server.addMsgHandler( "/2/rotary" + str(i), fader_callback)
-    
+    if server != None:
+        for i in range(1, 9):
+            server.addMsgHandler( "/2/rotary" + str(i), fader_callback)
 
-    server.addMsgHandler("/1/push1", set_all_callback) # On 
-    server.addMsgHandler("/1/push2", set_all_callback) # Off
+        server.addMsgHandler("/1/push1", set_all_callback) # On 
+        server.addMsgHandler("/1/push2", set_all_callback) # Off
 
-    server.addMsgHandler("/1/push3", dim_rotation_callback) # On 
-    server.addMsgHandler("/1/push4", dim_rotation_callback) # Off
-    
-    server.addMsgHandler("/1/push5", breath_callback) # On 
-    server.addMsgHandler("/1/push6", breath_callback) # Off
-    
-    server.addMsgHandler("/1/push7", breath_fade_callback) # On 
-    server.addMsgHandler("/1/push8", breath_fade_callback) # Off
-    
-    server.addMsgHandler("/1/push99", print_devices_callback) # Off
+        server.addMsgHandler("/1/push3", dim_rotation_callback) # On 
+        server.addMsgHandler("/1/push4", dim_rotation_callback) # Off
+        
+        server.addMsgHandler("/1/push5", breath_callback) # On 
+        server.addMsgHandler("/1/push6", breath_callback) # Off
+        
+        server.addMsgHandler("/1/push7", breath_fade_callback) # On 
+        server.addMsgHandler("/1/push8", breath_fade_callback) # Off
+        
+        server.addMsgHandler("/1/push99", print_devices_callback) # Off
     
     while True:
-
         if server != None:
             server.handle_request()
         else:
@@ -403,6 +409,14 @@ if __name__ == '__main__':
                 xim.stop()
                 dimming.stop()
                 sys.exit(0)
+            elif choice == '0':
+                action_breath(True)
+            elif choice == '1':
+                action_breath(False)
+            elif choice == '2':
+                action_breath_fade(True)
+            elif choice == '3':
+                action_breath_fade(False)
             # default case
             else:
                 print('I\'m sorry, what was that?')
