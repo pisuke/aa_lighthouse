@@ -70,6 +70,7 @@ class XIMDimmingRotation(Thread):
     
     def run(self):
         # if self.ximNumber>0:
+        print('run')
         if True:
             self.updateDeviceList()
             # print(d)
@@ -77,13 +78,13 @@ class XIMDimmingRotation(Thread):
                 with self.lock:
                     # dim LEDs in sequence
                     # try:
-                    if self.active:
-                        for device in self.orderedDeviceList:
+                    for device in self.orderedDeviceList:
+                        if self.active:
                             # print("XIM: " + str(ximID))
                             # put light to maximum brightness
                             # devices = filter(lambda ndi: ndi.deviceId == [ximID], self.deviceList)
                             # print(devices)
-                            intensity = 100
+                            intensity = 10
                             values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
                             ble_xim.advLightControl(device, values)
                             time.sleep(self.fadeTime/1000 + 0.1)
@@ -160,8 +161,9 @@ def action_print_devices():
 
 def action_set_intensity_for(device_id = -1, intensity = 0):
     print('action: set_intensity_for: device_id: ' + str(device_id) + " with intensity: " + str(intensity))
+    # dimming.updateDeviceList()
     devices = dimming.orderedDeviceList.items()
-    if len(devices) > device_id:
+    if len(devices) >= device_id:
         device = dimming.orderedDeviceList.items()[device_id - 1] # orderedList is 0 based index, the LED ID is one based index.
         # we only want to deal with one device so if our filtered list has more than one member we don't proceed
         # now we create the values dictionary.
@@ -175,6 +177,7 @@ def action_set_intensity_for(device_id = -1, intensity = 0):
 # all lights on / off
 def action_set_all(on = True):
     print('action: set all to ' + ("on" if on else "off"))
+    # dimming.updateDeviceList()
     dimming.active = False
     for device in dimming.deviceList:
         # print("XIM: " + str(ximID))
@@ -188,6 +191,17 @@ def action_set_all(on = True):
 # dynamic dimming rotation
 def action_dim_rotation(on = True):
     print('action: set dimming rotation:  ' + ("on" if on else "off"))
+    # dimming.updateDeviceList()
+    if on:
+        dimming.allOn = False
+        dimming.active = True
+    else:
+        dimming.active = False
+
+# dynamic dimming rotation
+def action_dim_rotation(on = True):
+    print('action: set dimming rotation:  ' + ("on" if on else "off"))
+    # dimming.updateDeviceList()
     if on:
         dimming.allOn = False
         dimming.active = True
@@ -208,6 +222,9 @@ def set_all_callback(path, tags, args, source):
 def dim_rotation_callback(path, tags, args, source):
     num = map(int, re.findall('\d', path.split('/')[-1]))[0]
     action_dim_rotation(True if num == 3 else False)
+
+def print_devices_callback(path, tags, args, source):
+    action_print_devices()
 
 
 if __name__ == '__main__':
@@ -243,12 +260,15 @@ if __name__ == '__main__':
 
     for i in range(1, 9):
         server.addMsgHandler( "/2/rotary" + str(i), fader_callback)
+    
 
     server.addMsgHandler("/1/push1", set_all_callback) # On 
     server.addMsgHandler("/1/push2", set_all_callback) # Off
 
     server.addMsgHandler("/1/push3", dim_rotation_callback) # On 
     server.addMsgHandler("/1/push4", dim_rotation_callback) # Off
+
+    server.addMsgHandler("/1/push8", print_devices_callback) # Off
     
     while True:
 
@@ -274,6 +294,7 @@ if __name__ == '__main__':
                         # but it's simpler to only allow assigned ids
                         # it's also typically more predictable behavior
                         device_id = [int(device_id_raw)]
+                        print(device_id[0])
                         assert 1 <= device_id[0] <= 8, "Device id should be in the range of 1 - 8"
                     except:
                         # catch the parsing error
@@ -295,8 +316,6 @@ if __name__ == '__main__':
             # dynamic dimming rotation
             elif choice == 's':
                 action_dim_rotation(True)
-                dimming.allOn = False
-                dimming.active = False
             # stop dynamic dimming rotation
             elif choice == 'e':
                 action_dim_rotation(False)
