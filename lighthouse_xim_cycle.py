@@ -22,7 +22,8 @@ server = None
 # set up cfg
 if system == "Darwin":
     cfg.MACOS = True
-    cfg.WINDOWS = False cfg.LINUX = False
+    cfg.WINDOWS = False
+    cfg.LINUX = False
 elif system == "Windows":
     cfg.WINDOWS = True
     cfg.MACOS = False
@@ -99,6 +100,7 @@ class XIMDimmingRotation(Thread):
                             action_set_all(True, 0.1, (numDivision - i) * 100)
                             if i != numDivision:
                                 action_set_all(False, 0.1)
+                        self.breathFading = False # This sequence should be terminated after competion
                     else:
                         ### State - Rotating: it should be paired in dimming: LED 1/5 LED 2/6 LED 3/7 LED 4/8
                         for group in self.groupedDeviceList:
@@ -129,7 +131,7 @@ class XIMDimmingRotation(Thread):
                             # print('runHost encountered an error (this is normal on exit)')
                         # sleep until next loop is due
                         if self.rotating:
-                            self.rotating = False
+                            self.rotating = False # This sequence should be terminated after the completion
                             print('Rotation Sequence ended')
                             action_set_all(False) # Need to force turn off all since it sometimes stuck turned on.
                     time.sleep(self._interval)
