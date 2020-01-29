@@ -56,9 +56,13 @@ class XIMDimmingRotation(Thread):
         self._interval = interval
         self.lock = Lock()
         self.ximNumber = len(deviceList)
-        self.active = False
         self.allOn = False
         self.deviceList = deviceList
+
+        # States
+        self.rotating = False
+        self.breathing = False
+        self.breathFading = False
 
     def updateDeviceList(self):
         self.deviceList = self.xim.get_device_list()
@@ -76,7 +80,7 @@ class XIMDimmingRotation(Thread):
         print(self.groupedDeviceList[2])
         print(self.groupedDeviceList[3])
         self.ximNumber = len(self.deviceList)
-    
+
     def run(self):
         # if self.ximNumber>0:
         print('run')
@@ -85,39 +89,51 @@ class XIMDimmingRotation(Thread):
             # print(d)
             while self._keep_alive:
                 with self.lock:
-                    # dim LEDs in sequence
-                    # try:
-                    for group in self.groupedDeviceList:
-                        if self.active:
-                            # print("XIM: " + str(ximID))
-                            # put light to maximum brightness
-                            # devices = filter(lambda ndi: ndi.deviceId == [ximID], self.deviceList)
-                            # print(devices)
-                            print('dim on')
-                            for device in group:
-                                intensity = 10
-                                values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
-                                print(device)
-                                ble_xim.advLightControl(device, values)
-                                time.sleep(0.05)
-                            time.sleep(self.fadeTime/1000 + 0.1)
-                            # put light to minimum brightness
-                            print('dim off')
-                            for device in group:
-                                print(device)
-                                intensity = 0
-                                values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
-                                ble_xim.advLightControl(device, values)
-                                time.sleep(0.05)
-                            time.sleep(self.fadeTime/1000 + 0.1)
-                    # except:
-                    #     pass
-                        # print('runHost encountered an error (this is normal on exit)')
-                    # sleep until next loop is due
-                    if self.active:
-                        self.active = False
-                        print('Rotation Sequence ended')
-                        action_set_all(False) # Need to force turn off all since it sometimes stuck turned on.
+                    ### State - Breathing: It should breath: 0 - 100 - 0 sequence for arbitary duration
+                    if self.breathing:
+                        action_set_all(True, 0.1)
+                        action_set_all(False, 0.1)
+                    ### State - Breath Fading: It should dim the max intensity to zero
+                    ### i.e: 0 - 100 - 0 - 90 - 0 - 80 - 0 - 70 - 0 - ....
+                    elif self.breathFading:
+                        numDivision = 10
+                        for i in range(0, numDivision + 1):
+                            action_set_all(True, 0.1, (numDivision - i) * 100)
+                            if i != numDivision:
+                                action_set_all(False, 0.1)
+                    else:
+                        ### State - Rotating: it should be paired in dimming: LED 1/5 LED 2/6 LED 3/7 LED 4/8
+                        for group in self.groupedDeviceList:
+                            if self.rotating:
+                                # print("XIM: " + str(ximID))
+                                # put light to maximum brightness
+                                # devices = filter(lambda ndi: ndi.deviceId == [ximID], self.deviceList)
+                                # print(devices)
+                                print('dim on')
+                                for device in group:
+                                    intensity = 10
+                                    values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
+                                    print(device)
+                                    ble_xim.advLightControl(device, values)
+                                    time.sleep(0.05)
+                                time.sleep(self.fadeTime/1000 + 0.1)
+                                # put light to minimum brightness
+                                print('dim off')
+                                for device in group:
+                                    print(device)
+                                    intensity = 0
+                                    values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
+                                    ble_xim.advLightControl(device, values)
+                                    time.sleep(0.05)
+                                time.sleep(self.fadeTime/1000 + 0.1)
+                        # except:
+                        #     pass
+                            # print('runHost encountered an error (this is normal on exit)')
+                        # sleep until next loop is due
+                        if self.rotating:
+                            self.rotating = False
+                            print('Rotation Sequence ended')
+                            action_set_all(False) # Need to force turn off all since it sometimes stuck turned on.
                     time.sleep(self._interval)
 
     def stop(self):
@@ -196,18 +212,18 @@ def action_set_intensity_for(device_id = -1, intensity = 0):
         print "Error: could not locate device with ID {}".format(device_id)
 
 # all lights on / off
-def action_set_all(on = True):
+def action_set_all(on = True, interval = 0.15, maxIntensity = 100):
     print('action: set all to ' + ("on" if on else "off"))
     # dimming.updateDeviceList()
-    dimming.active = False
+    dimming.rotating = False
     for device in dimming.deviceList:
         # print("XIM: " + str(ximID))
         # put light to maximum brightness
         # print(devices)
-        intensity = 100 if on else 0
+        intensity = maxIntensity if on else 0
         values = {"light_level":intensity, "fade_time":500, "response_time":0, "override_time":0, "lock_light_control":False}
         ble_xim.advLightControl(device, values)
-        time.sleep(0.15)
+        time.sleep(interval)
 
 # dynamic dimming rotation
 def action_dim_rotation(on = True):
@@ -215,19 +231,19 @@ def action_dim_rotation(on = True):
     # dimming.updateDeviceList()
     if on:
         dimming.allOn = False
-        dimming.active = True
+        dimming.rotating = True
     else:
-        dimming.active = False
+        dimming.rotating = False
 
-# dynamic dimming rotation
-def action_dim_rotation(on = True):
+# 0 - 100 - 0 cycle breathing
+def action_breath(on = True):
     print('action: set dimming rotation:  ' + ("on" if on else "off"))
     # dimming.updateDeviceList()
+    dimming.rotating = False
     if on:
-        dimming.allOn = False
-        dimming.active = True
+        dimming.breathing = True
     else:
-        dimming.active = False
+        dimming.breathing = False
 
 # OSC Handlers
 
