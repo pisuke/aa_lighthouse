@@ -5,16 +5,20 @@
 # 2020-01-31 francesco.anselmo@gmail.com
 
 FADE_TIME = 2000 # in milliseconds
+OSC_PORT = 5005
 
 import signal
 import cfg
 import sys
+import re
 import platform
 from collections import OrderedDict
+from OSC import OSCServer,OSCClient, OSCMessage
 
 system = platform.system()
 debug = False
 dimming = None
+server = OSCServer(("0.0.0.0", OSC_PORT))
 
 # set up cfg
 if system == "Darwin":
@@ -56,20 +60,12 @@ class XIMDimmingRotation(Thread):
         self.allOn = False
         self.deviceList = deviceList
 
-<<<<<<< HEAD
     def updateDeviceList(self):
-=======
-    def updateDeviceList(self): 
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
         self.deviceList = self.xim.get_device_list()
         self.orderedDeviceList = OrderedDict()
         keys = sorted(self.deviceList.keys(), key = lambda x: x.deviceId)
         for key in keys:
             self.orderedDeviceList[key] = self.deviceList[key]
-<<<<<<< HEAD
-=======
-            # self.orderedDeviceList.append(self.deviceList[key])
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
         self.ximNumber = len(self.deviceList)
     
     def run(self):
@@ -198,6 +194,22 @@ def action_dim_rotation(on = True):
     else:
         dimming.active = False
 
+# OSC Handlers
+
+### OSC Message Callbacks
+def fader_callback(path, tags, args, source):
+    num = map(int, re.findall('\d', path.split('/')[-1]))[0]
+    action_set_intensity_for(num, args[0] * 100)
+
+def set_all_callback(path, tags, args, source):
+    num = map(int, re.findall('\d', path.split('/')[-1]))[0]
+    action_set_all(True if num == 1 else False)
+
+def dim_rotation_callback(path, tags, args, source):
+    num = map(int, re.findall('\d', path.split('/')[-1]))[0]
+    action_dim_rotation(True if num == 3 else False)
+
+
 if __name__ == '__main__':
 
     if len(sys.argv) > 1 and sys.argv[1] == '-d':
@@ -212,7 +224,6 @@ if __name__ == '__main__':
 
     if not debug:
     # if Ctrl-C is invoked call the function to exit the program
-<<<<<<< HEAD
         signal.signal(signal.SIGINT, exit_handler)
         # start thread
         xim = BleXimThread()
@@ -229,152 +240,86 @@ if __name__ == '__main__':
     # basic command prompt loop
     commands = 'Enter:\n\td to detect and print devices\n\tb to set individual LED brightness\n\ta to set all lights to maximum brightness\n\to to switch off all lights\n\ts to start the dimming sequence\n\te to end the dimming sequence\n\t? show commands\n\tq to quit'
     print(commands)
-=======
-    signal.signal(signal.SIGINT, exit_handler)
-    # start thread
-    xim = BleXimThread()
-    xim.start()
-    deviceList = None
-    print("Detecting XIM LEDs, please wait ...")
-    for i in range(20):
-        deviceList = xim.get_device_list()
-        time.sleep(.25)
-    # start dimming rotation thread
-    dimming = XIMDimmingRotation(xim, deviceList, FADE_TIME)
-    dimming.start()
-    print("Number of XIM LEDs: " + str(dimming.ximNumber))
-    # basic command prompt loop
-    commands = 'Enter:\n\td to detect and print devices\n\tb to set individual LED brightness\n\ta to set all lights to maximum brightness\n\to to switch off all lights\n\ts to start the dimming sequence\n\te to end the dimming sequence\n\t? show commands\n\tq to quit'
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
 
+    for i in range(1, 9):
+        server.addMsgHandler( "/2/rotary" + str(i), fader_callback)
+
+    server.addMsgHandler("/1/push1", set_all_callback) # On 
+    server.addMsgHandler("/1/push2", set_all_callback) # Off
+
+    server.addMsgHandler("/1/push3", dim_rotation_callback) # On 
+    server.addMsgHandler("/1/push4", dim_rotation_callback) # Off
+    
     while True:
-        choice = raw_input('> ')
-        # print devices
-        if choice == 'd':
-<<<<<<< HEAD
-            action_print_devices()
-=======
-            dimming.updateDeviceList()
-            for item in dimming.orderedDeviceList:
-                name = ble_xim.getDeviceName(item)
-                intensity = dimming.deviceList[item].intensity
-                print "{}({}): {}".format(item.deviceId, name, intensity)
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
-        # set intensity
-        elif choice == 'b':
-            # first get a valid device id and intensity
-            device_id = None
-            intensity = None
-            while device_id is None or intensity is None:
-                device_id_raw = raw_input('device id: ')
-                intensity_raw = raw_input('intensity: ')
-                try:
-                    # the device id needs to be boxed into a list of integers
-                    # in this case the list is 1 integer
-                    # hypothetically we could also handle unassigned ids, which are lists of 3 bytes
-                    # but it's simpler to only allow assigned ids
-                    # it's also typically more predictable behavior
-                    device_id = [int(device_id_raw)]
-                    assert 1 <= device_id[0] <= 8, "Device id should be in the range of 1 - 8"
-<<<<<<< HEAD
 
-=======
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
-                except:
-                    # catch the parsing error
-                    print 'invalid device id (this program only works with assigned IDs)'
-                    device_id = None
-                try:
-                    # intensity needs to be a float between 0 and 100
-                    intensity = float(intensity_raw)
-                    assert 0 <= intensity <= 100, "Error: intensity out of range"
-                except:
-                    # catch the parsing error
-                    print 'invalid intensity'
-                    intensity = None
-<<<<<<< HEAD
-            if intensity != None and device_id != None:
-                action_set_intensity_for(int(device_id_raw), intensity)
-=======
-            # within ble_xim_pkg devices are handled by a combination of network id and device id
-            # so we filter the device list to only give us devices with a matching device id part
-            devices = dimming.orderedDeviceList.items()
-            if len(devices) > int(device_id_raw):
-                device = dimming.orderedDeviceList.items()[int(device_id_raw) - 1] # orderedList is 0 based index, the LED ID is one based index.
-                # we only want to deal with one device so if our filtered list has more than one member we don't proceed
-                # now we create the values dictionary.
-                # the names and acceptable values of each parameter can be found in the API documentation for each call
-                values = {"light_level":intensity, "fade_time":0, "response_time":0, "override_time":0, "lock_light_control":False}
-                # finally, actually issue the advertising command
-                ble_xim.advLightControl(device[0], values)
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
-            else:
-                print "Error: could not locate device with ID {}".format(device_id)
-
-        # dynamic dimming rotation
-        elif choice == 's':
-            action_dim_rotation(True)
-            dimming.allOn = False
-            dimming.active = False
-<<<<<<< HEAD
-=======
-            # for ximID in range(1, dimming.ximNumber+1):
-                # print("XIM: " + str(ximID))
-                # put light to maximum brightness
-                # devices = filter(lambda ndi: ndi.deviceId == [ximID], deviceList)
-                # print(devices)
-                # intensity = 0
-                # values = {"light_level":intensity, "fade_time":500, "response_time":0, "override_time":0, "lock_light_control":False}
-                # ble_xim.advLightControl(devices[0], values)
-                # time.sleep(0.15)
-            dimming.active = True
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
-        # stop dynamic dimming rotation
-        elif choice == 'e':
-            action_dim_rotation(False)
-        # all lights on to maximum
-        elif choice == 'a':
-<<<<<<< HEAD
-            action_set_all(True)
-        # all lights off
-        elif choice == 'o':
-            action_set_all(False)
-=======
-            dimming.active = False
-            for device in dimming.deviceList:
-                # print("XIM: " + str(ximID))
-                # put light to maximum brightness
-                # print(devices)
-                intensity = 100
-                values = {"light_level":intensity, "fade_time":500, "response_time":0, "override_time":0, "lock_light_control":False}
-                ble_xim.advLightControl(device, values)
-                time.sleep(0.15)
-        # all lights off
-        elif choice == 'o':
-            dimming.active = False
-            for device in dimming.deviceList:
-                # print("XIM: " + str(ximID))
-                # put light to maximum brightness
-                # print(devices)
-                intensity = 0
-                values = {"light_level":intensity, "fade_time":500, "response_time":0, "override_time":0, "lock_light_control":False}
-                ble_xim.advLightControl(device, values)
-                time.sleep(0.15)
->>>>>>> 66d156071aad46ef8981e191322697216590adc3
-        elif choice == '?':
-            f1 = Figlet(font='script')
-            print(f1.renderText('Lighthouse'))
-            f2 = Figlet(font='small')
-            print(f2.renderText('lighting control'))
-            print(commands)
-        # quit
-        elif choice == 'q':
-            dimming.active = False
-            print('goodbye')
-            # stop all the threads before exiting
-            xim.stop()
-            dimming.stop()
-            sys.exit(0)
-        # default case
+        if server != None:
+            server.handle_request()
         else:
-            print('I\'m sorry, what was that?')
+            choice = raw_input('> ')
+            # print devices
+            if choice == 'd':
+                action_print_devices()
+            # set intensity
+            elif choice == 'b':
+                # first get a valid device id and intensity
+                device_id = None
+                intensity = None
+                while device_id is None or intensity is None:
+                    device_id_raw = raw_input('device id: ')
+                    intensity_raw = raw_input('intensity: ')
+                    try:
+                        # the device id needs to be boxed into a list of integers
+                        # in this case the list is 1 integer
+                        # hypothetically we could also handle unassigned ids, which are lists of 3 bytes
+                        # but it's simpler to only allow assigned ids
+                        # it's also typically more predictable behavior
+                        device_id = [int(device_id_raw)]
+                        assert 1 <= device_id[0] <= 8, "Device id should be in the range of 1 - 8"
+                    except:
+                        # catch the parsing error
+                        print 'invalid device id (this program only works with assigned IDs)'
+                        device_id = None
+                    try:
+                        # intensity needs to be a float between 0 and 100
+                        intensity = float(intensity_raw)
+                        assert 0 <= intensity <= 100, "Error: intensity out of range"
+                    except:
+                        # catch the parsing error
+                        print 'invalid intensity'
+                        intensity = None
+                if intensity != None and device_id != None:
+                    action_set_intensity_for(int(device_id_raw), intensity)
+                else:
+                    print "Error: could not locate device with ID {}".format(device_id)
+
+            # dynamic dimming rotation
+            elif choice == 's':
+                action_dim_rotation(True)
+                dimming.allOn = False
+                dimming.active = False
+            # stop dynamic dimming rotation
+            elif choice == 'e':
+                action_dim_rotation(False)
+            # all lights on to maximum
+            elif choice == 'a':
+                action_set_all(True)
+            # all lights off
+            elif choice == 'o':
+                action_set_all(False)
+            elif choice == '?':
+                f1 = Figlet(font='script')
+                print(f1.renderText('Lighthouse'))
+                f2 = Figlet(font='small')
+                print(f2.renderText('lighting control'))
+                print(commands)
+            # quit
+            elif choice == 'q':
+                dimming.active = False
+                print('goodbye')
+                # stop all the threads before exiting
+                xim.stop()
+                dimming.stop()
+                sys.exit(0)
+            # default case
+            else:
+                print('I\'m sorry, what was that?')
