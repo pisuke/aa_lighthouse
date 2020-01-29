@@ -229,6 +229,8 @@ def action_set_all(on = True, interval = 0.15, maxIntensity = 100):
 def action_dim_rotation(on = True):
     print('action: set dimming rotation:  ' + ("on" if on else "off"))
     # dimming.updateDeviceList()
+    dimming.breathing = False
+    dimming.breathFading = False
     if on:
         dimming.allOn = False
         dimming.rotating = True
@@ -237,13 +239,25 @@ def action_dim_rotation(on = True):
 
 # 0 - 100 - 0 cycle breathing
 def action_breath(on = True):
-    print('action: set dimming rotation:  ' + ("on" if on else "off"))
+    print('action: set breath:  ' + ("on" if on else "off"))
     # dimming.updateDeviceList()
     dimming.rotating = False
+    dimming.breathFading = False
     if on:
         dimming.breathing = True
     else:
         dimming.breathing = False
+
+# 0 - 100 - 0 cycle breathing
+def action_breath_fade(on = True):
+    print('action: set breath fading:  ' + ("on" if on else "off"))
+    # dimming.updateDeviceList()
+    dimming.rotating = False
+    dimming.breathing = False
+    if on:
+        dimming.breathFading = True
+    else:
+        dimming.breathFading = False
 
 # OSC Handlers
 
@@ -260,9 +274,16 @@ def dim_rotation_callback(path, tags, args, source):
     num = map(int, re.findall('\d', path.split('/')[-1]))[0]
     action_dim_rotation(True if num == 3 else False)
 
+def breath_callback(path, tags, args, source):
+    num = map(int, re.findall('\d', path.split('/')[-1]))[0]
+    action_breath(True if num == 5 else False)
+
+def breath_fade_callback(path, tags, args, source):
+    num = map(int, re.findall('\d', path.split('/')[-1]))[0]
+    action_breath_fade(True if num == 7 else False)
+
 def print_devices_callback(path, tags, args, source):
     action_print_devices()
-
 
 if __name__ == '__main__':
 
@@ -304,8 +325,14 @@ if __name__ == '__main__':
 
     server.addMsgHandler("/1/push3", dim_rotation_callback) # On 
     server.addMsgHandler("/1/push4", dim_rotation_callback) # Off
-
-    server.addMsgHandler("/1/push8", print_devices_callback) # Off
+    
+    server.addMsgHandler("/1/push5", breath_callback) # On 
+    server.addMsgHandler("/1/push6", breath_callback) # Off
+    
+    server.addMsgHandler("/1/push7", breath_fade_callback) # On 
+    server.addMsgHandler("/1/push8", breath_fade_callback) # Off
+    
+    server.addMsgHandler("/1/push99", print_devices_callback) # Off
     
     while True:
 
