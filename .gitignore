@@ -1,5 +1,6 @@
 .DS_Store
 ble_xim_pkg
+BLE
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
