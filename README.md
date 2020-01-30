@@ -51,6 +51,9 @@ Enter:
 
 
 ### OSC Messages: via [TouchOSC](https://hexler.net/products/touchosc)
+
+When running the OSC server using `python lighthouse_xim_cycle.py -osc`, the following end points are usable
+
 - `/1/push{1,2}`: On / Off for all LEDs
 - `/1/push{3,4}`: On / Off for rotational dimming
 - `/2/rotary{1-8}`: Set individual LEDs intensity
