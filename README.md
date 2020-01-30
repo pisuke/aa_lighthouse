@@ -38,3 +38,12 @@ Enter:
 	q to quit
 >
 ```
+
+
+### OSC Messages: via [TouchOSC](https://hexler.net/products/touchosc)
+- `/1/push{1,2}`: On / Off for all LEDs
+- `/1/push{3,4}`: On / Off for rotational dimming
+- `/2/rotary{1-8}`: Set individual LEDs intensity
+
+![](https://user-images.githubusercontent.com/317202/73316701-a35c8d00-422b-11ea-9828-df7412e56ef2.png)
+![](https://user-images.githubusercontent.com/317202/73316700-a35c8d00-422b-11ea-98e8-fbd8146597d4.png)

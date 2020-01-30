@@ -1,3 +1,4 @@
 pyfiglet
-pyserial
-# pycrypto => easy_install
+serial
+pycrypto
+pyOSC
