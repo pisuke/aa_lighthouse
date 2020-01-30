@@ -2,10 +2,10 @@
 
 # lighting sequence for the "A Love Letter to the Lighthouse in the expanded field" performance
 # using the Xicato XIM LED modules
-# 2020-01-31 francesco.anselmo@gmail.com
+# 2020-01-31 francesco.anselmo@gmail.com, i.am@mnmly.com
 
 DEFAULT_GROUP = 10
-FADE_TIME = 1000 # in milliseconds
+DEFAULT_FADE_TIME = 2000 # in milliseconds
 OSC_PORT = 5005
 
 import signal
@@ -46,19 +46,20 @@ from threading import Thread, Lock
 def sortFn(item):
     return item.deviceId
 
-### Dimming rotation thread class
-class XIMDimmingRotation(Thread):
-    def __init__(self, xim, deviceList, fadeTime=1000, parent=None, interval=0.150):
+### Dimming  thread class
+class XIMDimming(Thread):
+    def __init__(self, xim, deviceList, fade_time=DEFAULT_FADE_TIME, parent=None, interval=0.150, group=DEFAULT_GROUP):
         Thread.__init__(self)
-        self.xim = xim
-        self.fadeTime = fadeTime
         self._keep_alive = True
         self._parent = parent
         self._interval = interval
+        self.xim = xim
+        self.fade_time = fade_time
         self.lock = Lock()
         self.ximNumber = len(deviceList)
         self.allOn = False
         self.deviceList = deviceList
+        self.group = group
 
         # States
         self.rotating = False
@@ -74,12 +75,8 @@ class XIMDimmingRotation(Thread):
         for key in keys:
             self.orderedDeviceList[key] = self.deviceList[key]
             self.groupedDeviceList[count % 4].append(key)
-            print(count % 4)
+            # print(count % 4)
             count = count + 1
-        print(self.groupedDeviceList[0])
-        print(self.groupedDeviceList[1])
-        print(self.groupedDeviceList[2])
-        print(self.groupedDeviceList[3])
         self.ximNumber = len(self.deviceList)
 
     def run(self):
@@ -92,17 +89,21 @@ class XIMDimmingRotation(Thread):
                 with self.lock:
                     ### State - Breathing: It should breath: 0 - 100 - 0 sequence for arbitary duration
                     if self.breathing:
-                        action_set_group(True, 0.1)
-                        action_set_group(False, 0.1)
+                        action_set_group(True, self.fade_time, group = self.group)
+                        time.sleep(self.fade_time/1000.0)
+                        action_set_group(False, self.fade_time, group = self.group)
+                        time.sleep(self.fade_time/1000.0)
                     ### State - Breath Fading: It should dim the max intensity to zero
                     ### i.e: 0 - 100 - 0 - 90 - 0 - 80 - 0 - 70 - 0 - ....
                     elif self.breathFading:
-                        numDivision = 10
-                        for i in range(0, numDivision + 1):
-                            action_set_group(True, 0.1, (numDivision - i) * 100)
-                            if i != numDivision:
-                                action_set_group(False, 0.1)
-                        self.breathFading = False # This sequence should be terminated after competion
+                        fading_values = [100,90,60,30,15,10,5,2,1,0]
+                        for v in fading_values:
+                            action_set_group(True, self.fade_time, maxIntensity=v, group = self.group)
+                            time.sleep(self.fade_time/1000.0)
+                            if v != 0:
+                                action_set_group(False, self.fade_time, group = self.group)
+                                time.sleep(self.fade_time/1000.0)
+                        self.breathFading = False # This sequence should be terminated after completion
                     else:
                         ### State - Rotating: it should be paired in dimming: LED 1/5 LED 2/6 LED 3/7 LED 4/8
                         for group in self.groupedDeviceList:
@@ -114,23 +115,18 @@ class XIMDimmingRotation(Thread):
                                 print('dim on')
                                 for device in group:
                                     intensity = 10
-                                    values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
-                                    print(device)
+                                    values = {"light_level":intensity, "fade_time":self.fade_time, "response_time":0, "override_time":0, "lock_light_control":False}
                                     ble_xim.advLightControl(device, values)
-                                    time.sleep(0.05)
-                                time.sleep(self.fadeTime/1000 + 0.1)
+                                    time.sleep(0.15)
+                                time.sleep(self.fade_time/1000 + 0.1)
                                 # put light to minimum brightness
                                 print('dim off')
                                 for device in group:
-                                    print(device)
                                     intensity = 0
-                                    values = {"light_level":intensity, "fade_time":self.fadeTime, "response_time":0, "override_time":0, "lock_light_control":False}
+                                    values = {"light_level":intensity, "fade_time":self.fade_time, "response_time":0, "override_time":0, "lock_light_control":False}
                                     ble_xim.advLightControl(device, values)
-                                    time.sleep(0.05)
-                                time.sleep(self.fadeTime/1000 + 0.1)
-                        # except:
-                        #     pass
-                            # print('runHost encountered an error (this is normal on exit)')
+                                    time.sleep(0.15)
+                                time.sleep(self.fade_time/1000 + 0.1)
                         # sleep until next loop is due
                         if self.rotating:
                             self.rotating = False # This sequence should be terminated after the completion
@@ -142,6 +138,7 @@ class XIMDimmingRotation(Thread):
         with self.lock:
             # stop the loop in the run method
             self._keep_alive = False
+### Dimming thread class
 
 
 ### BleXimThread class
@@ -159,7 +156,7 @@ class BleXimThread(Thread):
 
     def run(self):
         ble_xim.start()
-        print(ble_xim.getAllNetworkIds())
+        # print(ble_xim.getAllNetworkIds())
         while self._keep_alive:
             with self.lock:
                 # run the stack
@@ -183,9 +180,6 @@ class BleXimThread(Thread):
         netDevIdList = ble_xim.getXimIdList()
         return {netDevId : ble_xim.getLightStatus(netDevId) for netDevId in netDevIdList}
 ### BleXimThread class
-
-
-
 
 def exit_handler(sig, frame):
     sys.exit(0)
@@ -211,6 +205,7 @@ def action_set_intensity_for(device_id = -1, intensity = 0):
         values = {"light_level":intensity, "fade_time":0, "response_time":0, "override_time":0, "lock_light_control":False}
         # finally, actually issue the advertising command
         ble_xim.advLightControl(device[0], values)
+        # time.sleep(0.15)
     else:
         print "Error: could not locate device with ID {}".format(device_id)
 
@@ -224,7 +219,7 @@ def action_set_group(on = True, interval = 0.15, maxIntensity = 100, group = DEF
     dimming.rotating = False
     device_group = ble_device.NetDeviceId([0, 0, 0, 0], [49152+group])
     intensity = maxIntensity if on else 0
-    values = {"light_level":intensity, "fade_time":1000, "response_time":0, "override_time":0, "lock_light_control":False}
+    values = {"light_level":intensity, "fade_time":dimming.fade_time, "response_time":0, "override_time":0, "lock_light_control":False}
     ble_xim.advLightControl(device_group, values)
 
 
@@ -236,7 +231,7 @@ def action_set_all(on = True, interval = 0.15, maxIntensity = 100):
     for device in dimming.deviceList:
         # put light to maximum brightness
         intensity = maxIntensity if on else 0
-        values = {"light_level":intensity, "fade_time":1000, "response_time":0, "override_time":0, "lock_light_control":False}
+        values = {"light_level":intensity, "fade_time":dimming.fade_time, "response_time":0, "override_time":0, "lock_light_control":False}
         ble_xim.advLightControl(device, values)
         time.sleep(interval)
 
@@ -279,7 +274,10 @@ def action_breath_fade(on = True):
 ### OSC Message Callbacks
 def fader_callback(path, tags, args, source):
     num = map(int, re.findall('\d', path.split('/')[-1]))[0]
+    prev_fading = dimming.fade_time
+    dimming.fade_time = 0
     action_set_intensity_for(num, args[0] * 100)
+    dimming.fade_time = prev_fading
 
 def set_all_callback(path, tags, args, source):
     num = map(int, re.findall('\d', path.split('/')[-1]))[0]
@@ -301,6 +299,7 @@ def breath_fade_callback(path, tags, args, source):
 def print_devices_callback(path, tags, args, source):
     action_print_devices()
 
+
 if __name__ == '__main__':
 
     if len(sys.argv) > 1 and sys.argv[1] == '-osc':
@@ -314,31 +313,36 @@ if __name__ == '__main__':
 
     # if Ctrl-C is invoked call the function to exit the program
     signal.signal(signal.SIGINT, exit_handler)
-    # start thread
+
+    # start BLE XIM thread
     xim = BleXimThread()
     xim.start()
+    # detect XIM LED devices
     deviceList = None
     print("Detecting XIM LEDs, please wait ...")
     for i in range(20):
         deviceList = xim.get_device_list()
         time.sleep(.25)
-    print(dir(deviceList.items()[0][1]))
-    # start dimming rotation thread
-    dimming = XIMDimmingRotation(xim, deviceList, FADE_TIME)
+
+    # start dimming thread
+    dimming = XIMDimming(xim, deviceList, DEFAULT_FADE_TIME)
     dimming.start()
     print("Number of XIM LEDs: " + str(dimming.ximNumber))
+
     # basic command prompt loop
     commands = 'Enter:\
         \n\td to detect and print devices\
         \n\tb to set individual LED brightness\
+        \n\tf to set fading time\
+        \n\tg to set the active group number\
         \n\ta to set all lights to maximum brightness\
         \n\to to switch off all lights\
-        \n\ts to start the dimming sequence\
-        \n\te to end the dimming sequence\
+        \n\ts to start the rotating dimming sequence\
+        \n\te to end the rotating dimming sequence\
         \n\t0 to start the breathing sequence\
         \n\t1 to end the breathing sequence\
-        \n\t2 to start the breath fading sequence\
-        \n\t3 to end the breath fading sequence\
+        \n\t2 to start the breathing fading sequence\
+        \n\t3 to end the breathing fading sequence\
         \n\t? show commands\n\tq to quit'
     print(commands)
 
@@ -365,17 +369,46 @@ if __name__ == '__main__':
             server.handle_request()
         else:
             choice = raw_input('> ')
+
             # print devices
             if choice == 'd':
                 action_print_devices()
-            # set intensity
+            # set fading time
+            elif choice == 'f':
+                fading_time = None
+                while fading_time is None:
+                    fading_time_raw = raw_input('fading time (ms): ')
+                    try:
+                        fading_time = int(fading_time_raw)
+                        assert 1 <= fading_time <= 10000, "Fading time should be in the range of 0 - 10000"
+                    except:
+                        # catch the parsing error
+                        print 'invalid fading time'
+                        fading_time = None
+                dimming.fade_time = fading_time
+
+            # set group
+            elif choice == 'g':
+                group_number = None
+                while group_number is None:
+                    group_number_raw = raw_input('group id: ')
+                    try:
+                        group_number = int(group_number_raw)
+                        assert 1 <= group_number <= 16535, "Group id should be in the range of 1 - 16535"
+                    except:
+                        # catch the parsing error
+                        print 'invalid group id (this program only works with assigned IDs)'
+                        group_number = None
+                dimming.group = group_number
+
+            # set individual XIM LED brightness
             elif choice == 'b':
                 # first get a valid device id and intensity
                 device_id = None
                 intensity = None
                 while device_id is None or intensity is None:
                     device_id_raw = raw_input('device id: ')
-                    intensity_raw = raw_input('intensity: ')
+                    intensity_raw = raw_input('brightness: ')
                     try:
                         # the device id needs to be boxed into a list of integers
                         # in this case the list is 1 integer
@@ -384,7 +417,7 @@ if __name__ == '__main__':
                         # it's also typically more predictable behavior
                         device_id = [int(device_id_raw)]
                         print(device_id[0])
-                        assert 1 <= device_id[0] <= 8, "Device id should be in the range of 1 - 8"
+                        assert 1 <= device_id[0] <= 49151, "Device id should be in the range of 1 - 49151"
                     except:
                         # catch the parsing error
                         print 'invalid device id (this program only works with assigned IDs)'
@@ -392,10 +425,10 @@ if __name__ == '__main__':
                     try:
                         # intensity needs to be a float between 0 and 100
                         intensity = float(intensity_raw)
-                        assert 0 <= intensity <= 100, "Error: intensity out of range"
+                        assert 0 <= intensity <= 100, "Error: brightness out of range"
                     except:
                         # catch the parsing error
-                        print 'invalid intensity'
+                        print 'invalid brightness'
                         intensity = None
                 if intensity != None and device_id != None:
                     action_set_intensity_for(int(device_id_raw), intensity)
@@ -411,11 +444,11 @@ if __name__ == '__main__':
             # all lights on to maximum
             elif choice == 'a':
                 # action_set_all(True)
-                action_set_group(True)
+                action_set_group(True, group = dimming.group)
             # all lights off
             elif choice == 'o':
                 # action_set_all(False)
-                action_set_group(False)
+                action_set_group(False, group = dimming.group)
             elif choice == '?':
                 f1 = Figlet(font='script')
                 print(f1.renderText('Lighthouse'))
