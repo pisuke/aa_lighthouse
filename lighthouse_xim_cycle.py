@@ -4,6 +4,7 @@
 # using the Xicato XIM LED modules
 # 2020-01-31 francesco.anselmo@gmail.com
 
+DEFAULT_GROUP = 10
 FADE_TIME = 1000 # in milliseconds
 OSC_PORT = 5005
 
@@ -38,6 +39,7 @@ else:
 
 from pyfiglet import Figlet
 import ble_xim_pkg as ble_xim
+import ble_xim_pkg.bxdevice as ble_device
 import time
 from threading import Thread, Lock
 
@@ -46,7 +48,7 @@ def sortFn(item):
 
 ### Dimming rotation thread class
 class XIMDimmingRotation(Thread):
-    def __init__(self, xim, deviceList, fadeTime=1000, parent=None, interval=0.050):
+    def __init__(self, xim, deviceList, fadeTime=1000, parent=None, interval=0.150):
         Thread.__init__(self)
         self.xim = xim
         self.fadeTime = fadeTime
@@ -90,16 +92,16 @@ class XIMDimmingRotation(Thread):
                 with self.lock:
                     ### State - Breathing: It should breath: 0 - 100 - 0 sequence for arbitary duration
                     if self.breathing:
-                        action_set_all(True, 0.1)
-                        action_set_all(False, 0.1)
+                        action_set_group(True, 0.1)
+                        action_set_group(False, 0.1)
                     ### State - Breath Fading: It should dim the max intensity to zero
                     ### i.e: 0 - 100 - 0 - 90 - 0 - 80 - 0 - 70 - 0 - ....
                     elif self.breathFading:
                         numDivision = 10
                         for i in range(0, numDivision + 1):
-                            action_set_all(True, 0.1, (numDivision - i) * 100)
+                            action_set_group(True, 0.1, (numDivision - i) * 100)
                             if i != numDivision:
-                                action_set_all(False, 0.1)
+                                action_set_group(False, 0.1)
                         self.breathFading = False # This sequence should be terminated after competion
                     else:
                         ### State - Rotating: it should be paired in dimming: LED 1/5 LED 2/6 LED 3/7 LED 4/8
@@ -133,7 +135,7 @@ class XIMDimmingRotation(Thread):
                         if self.rotating:
                             self.rotating = False # This sequence should be terminated after the completion
                             print('Rotation Sequence ended')
-                            action_set_all(False) # Need to force turn off all since it sometimes stuck turned on.
+                            action_set_group(False) # Need to force turn off all since it sometimes stuck turned on.
                     time.sleep(self._interval)
 
     def stop(self):
@@ -157,6 +159,7 @@ class BleXimThread(Thread):
 
     def run(self):
         ble_xim.start()
+        print(ble_xim.getAllNetworkIds())
         while self._keep_alive:
             with self.lock:
                 # run the stack
@@ -211,17 +214,29 @@ def action_set_intensity_for(device_id = -1, intensity = 0):
     else:
         print "Error: could not locate device with ID {}".format(device_id)
 
+def action_set_group(on = True, interval = 0.15, maxIntensity = 100, group = DEFAULT_GROUP):
+    """
+    Set a group of LEDs on, off or to a specific intensity.
+    Note that the group numbers in the range 0 - 16535, but when advertising
+    to a group, the addresss is 0xC000 (49152) plus the group number.
+    """
+    print('action: set group '+ str(group) +' to ' + ("on" if on else "off"))
+    dimming.rotating = False
+    device_group = ble_device.NetDeviceId([0, 0, 0, 0], [49152+group])
+    intensity = maxIntensity if on else 0
+    values = {"light_level":intensity, "fade_time":1000, "response_time":0, "override_time":0, "lock_light_control":False}
+    ble_xim.advLightControl(device_group, values)
+
+
 # all lights on / off
 def action_set_all(on = True, interval = 0.15, maxIntensity = 100):
     print('action: set all to ' + ("on" if on else "off"))
-    # dimming.updateDeviceList()
     dimming.rotating = False
+    intensity = maxIntensity if on else 0
     for device in dimming.deviceList:
-        # print("XIM: " + str(ximID))
         # put light to maximum brightness
-        # print(devices)
         intensity = maxIntensity if on else 0
-        values = {"light_level":intensity, "fade_time":500, "response_time":0, "override_time":0, "lock_light_control":False}
+        values = {"light_level":intensity, "fade_time":1000, "response_time":0, "override_time":0, "lock_light_control":False}
         ble_xim.advLightControl(device, values)
         time.sleep(interval)
 
@@ -268,7 +283,8 @@ def fader_callback(path, tags, args, source):
 
 def set_all_callback(path, tags, args, source):
     num = map(int, re.findall('\d', path.split('/')[-1]))[0]
-    action_set_all(True if num == 1 else False)
+    # action_set_all(True if num == 1 else False)
+    action_set_group(True if num == 1 else False)
 
 def dim_rotation_callback(path, tags, args, source):
     num = map(int, re.findall('\d', path.split('/')[-1]))[0]
@@ -306,6 +322,7 @@ if __name__ == '__main__':
     for i in range(20):
         deviceList = xim.get_device_list()
         time.sleep(.25)
+    print(dir(deviceList.items()[0][1]))
     # start dimming rotation thread
     dimming = XIMDimmingRotation(xim, deviceList, FADE_TIME)
     dimming.start()
@@ -329,20 +346,20 @@ if __name__ == '__main__':
         for i in range(1, 9):
             server.addMsgHandler( "/2/rotary" + str(i), fader_callback)
 
-        server.addMsgHandler("/1/push1", set_all_callback) # On 
+        server.addMsgHandler("/1/push1", set_all_callback) # On
         server.addMsgHandler("/1/push2", set_all_callback) # Off
 
-        server.addMsgHandler("/1/push3", dim_rotation_callback) # On 
+        server.addMsgHandler("/1/push3", dim_rotation_callback) # On
         server.addMsgHandler("/1/push4", dim_rotation_callback) # Off
-        
-        server.addMsgHandler("/1/push5", breath_callback) # On 
+
+        server.addMsgHandler("/1/push5", breath_callback) # On
         server.addMsgHandler("/1/push6", breath_callback) # Off
-        
-        server.addMsgHandler("/1/push7", breath_fade_callback) # On 
+
+        server.addMsgHandler("/1/push7", breath_fade_callback) # On
         server.addMsgHandler("/1/push8", breath_fade_callback) # Off
-        
+
         server.addMsgHandler("/1/push99", print_devices_callback) # Off
-    
+
     while True:
         if server != None:
             server.handle_request()
@@ -393,10 +410,12 @@ if __name__ == '__main__':
                 action_dim_rotation(False)
             # all lights on to maximum
             elif choice == 'a':
-                action_set_all(True)
+                # action_set_all(True)
+                action_set_group(True)
             # all lights off
             elif choice == 'o':
-                action_set_all(False)
+                # action_set_all(False)
+                action_set_group(False)
             elif choice == '?':
                 f1 = Figlet(font='script')
                 print(f1.renderText('Lighthouse'))
