@@ -1,12 +1,17 @@
 # aa_lighthouse
 Code for controlling the light in the 2020 Mark Fisher Scholarship performance event "A Love Letter to the Lighthouse in the Expanded Field" at the Architectural Association, London.
 
-## Installation
+## Hardware Configuration
 
-0. (Optional) conda create -n lighthouse python=2.7.16
-1. Get the `ble_xim_pkg` from [Xicato](http://www.xicato.com)
-2. `pip install -r requirements.txt`
-3. `python lighthouse_xim_cycle.py`
+1. Set up the XIM LEDs with incremental ID number, for instance from 1 to n, where n is the total number of XID LEDs.
+2. Set up a group with all the XIM LEDs. The default group number is 10.
+
+## Software installation
+
+1. (Optional) conda create -n lighthouse python=2.7.16
+2. Get the `ble_xim_pkg` from [Xicato](http://www.xicato.com)
+3. `pip install -r requirements.txt`
+4. `python lighthouse_xim_cycle.py`
 
 The output is something like this
 
@@ -26,17 +31,22 @@ The output is something like this
     |___/               |___/
 
 Detecting XIM LEDs, please wait ...
-Number of XIM LEDs: 3
+ Number of XIM LEDs: 1
 Enter:
 	d to detect and print devices
 	b to set individual LED brightness
-        a to set all lights to maximum brightness
-        o to switch off all lights
-	s to start the dimming sequence
-	e to end the dimming sequence
+	f to set fading time
+	g to set the active group number
+	a to set all lights to maximum brightness
+	o to switch off all lights
+	s to start the rotating dimming sequence
+	e to end the rotating dimming sequence
+	0 to start the breathing sequence
+	1 to end the breathing sequence
+	2 to start the breathing fading sequence
+	3 to end the breathing fading sequence
 	? show commands
 	q to quit
->
 ```
 
 

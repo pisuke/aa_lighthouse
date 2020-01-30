@@ -80,8 +80,6 @@ class XIMDimming(Thread):
         self.ximNumber = len(self.deviceList)
 
     def run(self):
-        # if self.ximNumber>0:
-        print('run')
         if True:
             self.updateDeviceList()
             # print(d)
