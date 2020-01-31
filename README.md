@@ -9,7 +9,7 @@ Code for controlling the light in the 2020 Mark Fisher Scholarship performance e
 ## Software installation
 
 1. (Optional) `conda create -n lighthouse python=2.7.16`
-2. Get the `ble_xim_pkg` from [Xicato](http://www.xicato.com)
+2. Get the `ble_xim_pkg` library from [Xicato](http://www.xicato.com)
 3. `pip install -r requirements.txt`
 4. `python lighthouse_xim_cycle.py`
 

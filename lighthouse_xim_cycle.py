@@ -211,7 +211,7 @@ def action_set_group(on = True, interval = 0.15, maxIntensity = 100, group = DEF
     """
     Set a group of LEDs on, off or to a specific intensity.
     Note that the group numbers in the range 0 - 16535, but when advertising
-    to a group, the addresss is 0xC000 (49152) plus the group number.
+    to a group, the address is 0xC000 (49152) plus the group number.
     """
     print('action: set group '+ str(group) +' to ' + ("on" if on else "off"))
     dimming.rotating = False
